@@ -5,7 +5,6 @@ A Flask dashboard for tracking HDB resale flat price trends across all Singapore
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=flat&logo=flask)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
-![Render](https://img.shields.io/badge/Deployed_on-Render-46E3B7?style=flat)
 
 ---
 
