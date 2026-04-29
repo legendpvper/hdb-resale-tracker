@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HDB Resale Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --bg2:      #13151c;
+    --bg3:      #1a1d27;
+    --border:   #252836;
+    --accent:   #e8a838;
+    --accent2:  #3b7dd8;
+    --text:     #e2e4ec;
+    --muted:    #6b7089;
+    --success:  #3ecf8e;
+    --danger:   #e85d5d;
+    --font:     'DM Sans', sans-serif;
+    --mono:     'DM Mono', monospace;
+    --radius:   10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── Layout ── */
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .logo-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .nav-section {
+    padding: 12px 20px 4px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    font-size: 13.5px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(232,168,56,0.06); font-weight: 500; }
+
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Main ── */
+  .main { padding: 32px 36px; overflow-x: hidden; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Header bar ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .page-sub { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+  /* ── Stat cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .stat-value { font-size: 22px; font-weight: 600; font-family: var(--mono); letter-spacing: -0.03em; }
+  .stat-value.accent { color: var(--accent); }
+
+  /* ── Panel (chart container) ── */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .panel-title { font-size: 14px; font-weight: 600; }
+  .panel-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Controls ── */
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  select, input[type=number], input[type=text] {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12.5px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color 0.15s;
+    height: 34px;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+
+  .btn {
+    background: var(--accent);
+    color: #0d0f14;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    height: 34px;
+    font-family: var(--font);
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn.secondary {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 400;
+  }
+  .btn.danger { background: var(--danger); color: #fff; }
+
+  .chart-wrap { position: relative; height: 280px; }
+
+  /* ── Town summary table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 8px 14px;
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .price-cell { font-family: var(--mono); font-weight: 500; }
+  .rank-badge {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bg3);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    line-height: 22px;
+    font-family: var(--mono);
+  }
+  .rank-badge.top { background: rgba(232,168,56,0.15); color: var(--accent); }
+
+  /* ── Bar chart row (town summary visual) ── */
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-fill {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--accent2);
+    transition: width 0.4s ease;
+  }
+
+  /* ── Compare: town multi-select ── */
+  .town-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .chip.selected { background: rgba(232,168,56,0.15); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Alerts ── */
+  .alert-list { display: flex; flex-direction: column; gap: 10px; }
+  .alert-row {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .alert-info { flex: 1; }
+  .alert-title { font-size: 13.5px; font-weight: 500; }
+  .alert-meta { font-size: 12px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+  .direction-badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .direction-badge.above { background: rgba(62,207,142,0.15); color: var(--success); }
+  .direction-badge.below { background: rgba(232,93,93,0.15); color: var(--danger); }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+  /* ── Animations ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .page.active { animation: fadeIn 0.2s ease; }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 60px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Latest month chip ── */
+  .month-pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(232,168,56,0.1);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(232,168,56,0.25);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-title">HDB Tracker</div>
+      <div class="logo-sub">Resale price intelligence</div>
+    </div>
+
+    <div class="nav-section">Views</div>
+    <div class="nav-item active" data-page="overview" onclick="nav(this,'overview')">
+      <span class="nav-dot" style="background:#e8a838"></span> Overview
+    </div>
+    <div class="nav-item" data-page="trends" onclick="nav(this,'trends')">
+      <span class="nav-dot" style="background:#3b7dd8"></span> Trend chart
+    </div>
+    <div class="nav-item" data-page="compare" onclick="nav(this,'compare')">
+      <span class="nav-dot" style="background:#3ecf8e"></span> Compare towns
+    </div>
+
+    <div class="nav-section" style="margin-top:12px;">Alerts</div>
+    <div class="nav-item" data-page="alerts" onclick="nav(this,'alerts')">
+      <span class="nav-dot" style="background:#e85d5d"></span> Price alerts
+    </div>
+
+    <div style="margin-top:auto;padding:20px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">
+        Data: <a href="https://data.gov.sg" style="color:var(--accent);text-decoration:none">data.gov.sg</a><br>
+        Updated daily 08:00 SGT
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main content ── -->
+  <main class="main">
+
+    <!-- ── OVERVIEW ── -->
+    <section id="page-overview" class="page active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Market overview</div>
+          <div class="page-sub">Avg resale price by town — all flat types</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="month-pill">{{ latest_month }}</span>
+          <select id="ov-flat" onchange="loadOverview()">
+            {% for ft in flat_types %}
+            <option value="{{ ft }}" {% if ft == '4 ROOM' %}selected{% endif %}>{{ ft }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stat-grid">
+        {% if summary %}
+        <div class="stat-card">
+          <div class="stat-label">Highest town</div>
+          <div class="stat-value accent" style="font-size:16px">{{ summary[0].town }}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)">{{ fmt(summary[0].avg_price) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Towns tracked</div>
+          <div class="stat-value accent">{{ summary|length }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total transactions</div>
+          <div class="stat-value accent">{{ summary|sum(attribute='tx_count') }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Town table -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">All towns</div>
+            <div class="panel-sub" id="ov-sub">Sorted by avg price — {{ latest_month }}</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Town</th>
+                <th>Avg price</th>
+                <th>Transactions</th>
+                <th>Relative</th>
+              </tr>
+            </thead>
+            <tbody id="overview-tbody">
+              {% for r in summary %}
+              {% set max_price = summary[0].avg_price %}
+              <tr>
+                <td><span class="rank-badge {% if loop.index <= 3 %}top{% endif %}">{{ loop.index }}</span></td>
+                <td style="font-weight:500">{{ r.town }}</td>
+                <td class="price-cell">{{ fmt(r.avg_price) }}</td>
+                <td style="color:var(--muted)">{{ r.tx_count }}</td>
+                <td>
+                  <div class="bar-row">
+                    <div class="bar-fill" style="width:{{ (r.avg_price / max_price * 100)|int }}px"></div>
+                    <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">
+                      {{ "%.0f"|format(r.avg_price / max_price * 100) }}%
+                    </span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRENDS ── -->
+    <section id="page-trends" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Price trend</div>
+          <div class="page-sub">Monthly avg resale price for a single town</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" id="trend-title">Select a town to view trend</div>
+          </div>
+          <div class="controls">
+            <select id="trend-town" onchange="loadTrend()">
+              <option value="">— select town —</option>
+              {% for t in towns %}
+              <option value="{{ t }}" {% if t == 'HOUGANG' %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+            <select id="trend-flat" onchange="loadTrend()">
+              {% for ft in flat_types %}
+              <option value="{{ ft }}" {% if ft == '4 ROOM' %}selected{% endif %}>{{ ft }}</option>
+              {% endfor %}
+            </select>
+            <select id="trend-months" onchange="loadTrend()">
+              <option value="12">12 months</option>
+              <option value="24" selected>24 months</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="trend-chart"></canvas>
+        </div>
+
+        <div id="trend-stats" style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap"></div>
+      </div>
+    </section>
+
+    <!-- ── COMPARE ── -->
+    <section id="page-compare" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Compare towns</div>
+          <div class="page-sub">Overlay price trends for multiple towns</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Town selection</div>
+            <div class="panel-sub">Click to add/remove (max 5)</div>
+          </div>
+          <div class="controls">
+            <select id="cmp-flat" onchange="loadCompare()">
+              {% for ft in flat_types %}
+              <option value="{{ ft }}" {% if ft == '4 ROOM' %}selected{% endif %}>{{ ft }}</option>
+              {% endfor %}
+            </select>
+            <select id="cmp-months" onchange="loadCompare()">
+              <option value="12" selected>12 months</option>
+              <option value="24">24 months</option>
+            </select>
+          </div>
+        </div>
+        <div class="town-chips" id="compare-chips">
+          {% for t in towns %}
+          <div class="chip {% if t in ['HOUGANG','TAMPINES','QUEENSTOWN'] %}selected{% endif %}"
+               onclick="toggleChip(this,'{{ t }}')" data-town="{{ t }}">{{ t }}</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title" id="cmp-title">Price comparison</div>
+        </div>
+        <div class="chart-wrap" style="height:320px">
+          <canvas id="compare-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ALERTS ── -->
+    <section id="page-alerts" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Price alerts</div>
+          <div class="page-sub">Get notified via Telegram when thresholds are crossed</div>
+        </div>
+      </div>
+
+      <!-- Add alert form -->
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-header">
+          <div class="panel-title">New alert</div>
+        </div>
+        <div class="controls" style="flex-wrap:wrap;gap:8px">
+          <select id="al-town">
+            {% for t in towns %}
+            <option value="{{ t }}" {% if t == 'HOUGANG' %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+          <select id="al-flat">
+            {% for ft in flat_types %}
+            <option value="{{ ft }}" {% if ft == '4 ROOM' %}selected{% endif %}>{{ ft }}</option>
+            {% endfor %}
+          </select>
+          <select id="al-dir">
+            <option value="above">rises above</option>
+            <option value="below">falls below</option>
+          </select>
+          <input type="number" id="al-threshold" placeholder="e.g. 600000" style="width:140px">
+          <button class="btn" onclick="createAlert()">Add alert</button>
+        </div>
+        <div id="alert-msg" style="font-size:12px;margin-top:10px;display:none"></div>
+      </div>
+
+      <!-- Alert list -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Active alerts</div>
+          <button class="btn secondary" onclick="loadAlerts()" style="font-size:12px">Refresh</button>
+        </div>
+        <div id="alert-list" class="alert-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ── Chart instances ──────────────────────────────────────────────────────────
+let trendChart = null;
+let compareChart = null;
+
+const PALETTE = ['#e8a838','#3b7dd8','#3ecf8e','#e85d5d','#9d6ef7','#f0845c'];
+
+function chartDefaults() {
+  Chart.defaults.color = '#6b7089';
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.font.size = 12;
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function nav(el, pageId) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-' + pageId).classList.add('active');
+
+  if (pageId === 'trends') loadTrend();
+  if (pageId === 'compare') loadCompare();
+  if (pageId === 'alerts') loadAlerts();
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+function loadOverview() {
+  const flat = document.getElementById('ov-flat').value;
+  fetch(`/api/summary?flat_type=${encodeURIComponent(flat)}`)
+    .then(r => r.json())
+    .then(d => {
+      const tbody = document.getElementById('overview-tbody');
+      const rows = d.rows;
+      const maxP = rows[0]?.avg_price || 1;
+      tbody.innerHTML = rows.map((r, i) => `
+        <tr>
+          <td><span class="rank-badge ${i<3?'top':''}">${i+1}</span></td>
+          <td style="font-weight:500">${r.town}</td>
+          <td class="price-cell">$${r.avg_price.toLocaleString()}</td>
+          <td style="color:var(--muted)">${r.tx_count}</td>
+          <td>
+            <div class="bar-row">
+              <div class="bar-fill" style="width:${Math.round(r.avg_price/maxP*100)}px"></div>
+              <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${Math.round(r.avg_price/maxP*100)}%</span>
+            </div>
+          </td>
+        </tr>`).join('');
+      document.getElementById('ov-sub').textContent = `Sorted by avg price — ${d.month} — ${flat}`;
+    });
+}
+
+// ── Trend ────────────────────────────────────────────────────────────────────
+function loadTrend() {
+  const town = document.getElementById('trend-town').value;
+  const flat = document.getElementById('trend-flat').value;
+  const months = document.getElementById('trend-months').value;
+  if (!town) return;
+
+  document.getElementById('trend-title').textContent = `${town} — ${flat}`;
+
+  fetch(`/api/trend?town=${encodeURIComponent(town)}&flat_type=${encodeURIComponent(flat)}&months=${months}`)
+    .then(r => r.json())
+    .then(data => {
+      const labels = data.map(d => d.month);
+      const prices = data.map(d => d.avg_price);
+
+      if (trendChart) trendChart.destroy();
+      const ctx = document.getElementById('trend-chart').getContext('2d');
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Avg price',
+            data: prices,
+            borderColor: '#e8a838',
+            backgroundColor: 'rgba(232,168,56,0.08)',
+            pointBackgroundColor: '#e8a838',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.35,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => `$${ctx.parsed.y.toLocaleString()}`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45 } },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k' }
+            }
+          }
+        }
+      });
+
+      // Trend stats
+      if (prices.length >= 2) {
+        const first = prices[0], last = prices[prices.length-1];
+        const change = ((last - first) / first * 100).toFixed(1);
+        const min = Math.min(...prices), max = Math.max(...prices);
+        document.getElementById('trend-stats').innerHTML = `
+          <div class="stat-card" style="flex:1;min-width:140px">
+            <div class="stat-label">Latest avg</div>
+            <div class="stat-value" style="font-size:18px">$${last.toLocaleString()}</div>
+          </div>
+          <div class="stat-card" style="flex:1;min-width:140px">
+            <div class="stat-label">${months}-month change</div>
+            <div class="stat-value" style="font-size:18px;color:${change>=0?'var(--success)':'var(--danger)'}">${change>=0?'+':''}${change}%</div>
+          </div>
+          <div class="stat-card" style="flex:1;min-width:140px">
+            <div class="stat-label">Range</div>
+            <div class="stat-value" style="font-size:14px;line-height:1.5">${'$'+min.toLocaleString()}<br><span style="color:var(--muted)">—</span> $${max.toLocaleString()}</div>
+          </div>`;
+      }
+    });
+}
+
+// ── Compare ──────────────────────────────────────────────────────────────────
+let selectedTowns = ['HOUGANG', 'TAMPINES', 'QUEENSTOWN'];
+
+function toggleChip(el, town) {
+  const idx = selectedTowns.indexOf(town);
+  if (idx >= 0) {
+    if (selectedTowns.length <= 1) return;
+    selectedTowns.splice(idx, 1);
+    el.classList.remove('selected');
+  } else {
+    if (selectedTowns.length >= 5) return;
+    selectedTowns.push(town);
+    el.classList.add('selected');
+  }
+  loadCompare();
+}
+
+function loadCompare() {
+  if (!selectedTowns.length) return;
+  const flat = document.getElementById('cmp-flat').value;
+  const months = document.getElementById('cmp-months').value;
+
+  const params = selectedTowns.map(t => `town=${encodeURIComponent(t)}`).join('&');
+  fetch(`/api/compare?${params}&flat_type=${encodeURIComponent(flat)}&months=${months}`)
+    .then(r => r.json())
+    .then(data => {
+      // Group by town
+      const townData = {};
+      const allMonths = [...new Set(data.map(d => d.month))].sort();
+      selectedTowns.forEach(t => townData[t] = {});
+      data.forEach(d => { if (townData[d.town]) townData[d.town][d.month] = d.avg_price; });
+
+      const datasets = selectedTowns.map((town, i) => ({
+        label: town,
+        data: allMonths.map(m => townData[town][m] || null),
+        borderColor: PALETTE[i],
+        backgroundColor: 'transparent',
+        pointRadius: 3,
+        borderWidth: 2,
+        tension: 0.3,
+        spanGaps: true,
+      }));
+
+      if (compareChart) compareChart.destroy();
+      const ctx = document.getElementById('compare-chart').getContext('2d');
+      compareChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: allMonths, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { boxWidth: 12, padding: 16, color: '#9ca3af' }
+            },
+            tooltip: {
+              callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y?.toLocaleString() || '—'}` }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45 } },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k' }
+            }
+          }
+        }
+      });
+
+      document.getElementById('cmp-title').textContent =
+        `${selectedTowns.join(' vs ')} — ${flat}`;
+    });
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+function loadAlerts() {
+  fetch('/api/alerts').then(r => r.json()).then(alerts => {
+    const el = document.getElementById('alert-list');
+    if (!alerts.length) {
+      el.innerHTML = '<div class="empty-state">No active alerts. Add one above.</div>';
+      return;
+    }
+    el.innerHTML = alerts.map(a => `
+      <div class="alert-row">
+        <div class="alert-info">
+          <div class="alert-title">${a.town} — ${a.flat_type}</div>
+          <div class="alert-meta">Avg price ${a.direction} $${parseFloat(a.threshold).toLocaleString()}</div>
+        </div>
+        <span class="direction-badge ${a.direction}">${a.direction}</span>
+        <button class="btn danger" onclick="removeAlert(${a.id})" style="height:30px;padding:0 10px;font-size:12px">Remove</button>
+      </div>`).join('');
+  });
+}
+
+function createAlert() {
+  const town = document.getElementById('al-town').value;
+  const flat_type = document.getElementById('al-flat').value;
+  const direction = document.getElementById('al-dir').value;
+  const threshold = document.getElementById('al-threshold').value;
+  const msg = document.getElementById('alert-msg');
+
+  if (!threshold) {
+    showMsg(msg, 'Enter a threshold price', 'var(--danger)');
+    return;
+  }
+
+  fetch('/api/alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ town, flat_type, direction, threshold: parseFloat(threshold) })
+  }).then(r => {
+    if (r.ok) {
+      showMsg(msg, '✓ Alert created', 'var(--success)');
+      document.getElementById('al-threshold').value = '';
+      loadAlerts();
+    } else {
+      showMsg(msg, 'Failed to create alert', 'var(--danger)');
+    }
+  });
+}
+
+function removeAlert(id) {
+  fetch(`/api/alerts/${id}`, { method: 'DELETE' })
+    .then(() => loadAlerts());
+}
+
+function showMsg(el, text, color) {
+  el.textContent = text;
+  el.style.color = color;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+chartDefaults();
+// Load trend for default town on page load in background
+setTimeout(() => {
+  if (document.getElementById('trend-town').value) loadTrend();
+}, 100);
+</script>
+</body>
+</html>
